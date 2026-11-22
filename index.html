@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download budget files</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #0a0e1a; color: #eef2fb; margin: 0;
+    padding: 32px 20px; line-height: 1.55;
+  }
+  main { max-width: 620px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color: #9aa7c2; font-size: 14px; margin: 0 0 22px; }
+  button {
+    font: inherit; font-weight: 650; font-size: 15px;
+    width: 100%; min-height: 50px; border: 0; border-radius: 13px;
+    background: linear-gradient(145deg, #4f9cf9, #6f8ef7); color: #fff;
+    cursor: pointer; margin-bottom: 10px;
+  }
+  button:disabled { opacity: .55; cursor: default; }
+  button.secondary { background: #1a2237; color: #eef2fb; border: 1px solid #233049; }
+  pre {
+    background: #121829; border: 1px solid #1b2438; border-radius: 12px;
+    padding: 13px; font-size: 12px; overflow-x: auto; white-space: pre-wrap;
+    margin: 14px 0 0; font-family: ui-monospace, monospace;
+  }
+  .ok { color: #3fc4a6; } .bad { color: #f2686b; } .dim { color: #6b7899; }
+  .note {
+    background: #121829; border: 1px solid #233049; border-left: 3px solid #4f9cf9;
+    border-radius: 10px; padding: 12px 14px; font-size: 13px; margin: 0 0 20px; color: #c9d3e8;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Download your budget app files</h1>
+  <p class="sub">This packages every file GitHub Desktop needs into a single .zip.</p>
+
+  <div class="note">
+    Only use this page from the preview URL (it starts with <strong>https://</strong>).
+    Browsers block file downloads on <code>file://</code> pages, so opening this
+    page from your hard drive will not work.
+  </div>
+
+  <button type="button" id="buildBtn">Build the .zip</button>
+  <button type="button" id="againBtn" class="secondary" hidden>Build again</button>
+
+  <pre id="out" class="dim">Waiting…</pre>
+</main>
+
+<script src="js/bundle-files.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var out = document.getElementById('out');
+  var buildBtn = document.getElementById('buildBtn');
+  var againBtn = document.getElementById('againBtn');
+
+  function log(html) { out.innerHTML = html; }
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /* ── CRC32 (required by the ZIP format) ───────────────────── */
+  var CRC_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var i = 0; i < 256; i++) {
+      var c = i;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[i] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes) {
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) {
+      crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  /* ── minimal ZIP writer, "store" method (no compression) ──── */
+  // Store-only keeps this dependency-free and is fine for text files.
+  var DOS_TIME = (12 << 11);              // 12:00:00
+  var DOS_DATE = ((2026 - 1980) << 9) | (11 << 5) | 22;
+
+  function buildZip(entries) {
+    var encoder = new TextEncoder();
+    var chunks = [];
+    var central = [];
+    var offset = 0;
+
+    entries.forEach(function (entry) {
+      var nameBytes = encoder.encode(entry.name);
+      var dataBytes = entry.bytes;
+      var crc = crc32(dataBytes);
+
+      var local = new Uint8Array(30 + nameBytes.length);
+      var dv = new DataView(local.buffer);
+      dv.setUint32(0, 0x04034b50, true);   // local file header signature
+      dv.setUint16(4, 20, true);           // version needed
+      dv.setUint16(6, 0x0800, true);       // flags: UTF-8 names
+      dv.setUint16(8, 0, true);            // method: store
+      dv.setUint16(10, DOS_TIME, true);
+      dv.setUint16(12, DOS_DATE, true);
+      dv.setUint32(14, crc, true);
+      dv.setUint32(18, dataBytes.length, true);  //compressed size
+      dv.setUint32(22, dataBytes.length, true);  // uncompressed size
+      dv.setUint16(26, nameBytes.length, true);
+      dv.setUint16(28, 0, true);           // extra field length
+      local.set(nameBytes, 30);
+
+      chunks.push(local, dataBytes);
+
+      var cd = new Uint8Array(46 + nameBytes.length);
+      var cv = new DataView(cd.buffer);
+      cv.setUint32(0, 0x02014b50, true);   // central directory signature
+      cv.setUint16(4, 20, true);           // version made by
+      cv.setUint16(6, 20, true);           // version needed
+      cv.setUint16(8, 0x0800, true);
+      cv.setUint16(10, 0, true);
+      cv.setUint16(12, DOS_TIME, true);
+      cv.setUint16(14, DOS_DATE, true);
+      cv.setUint32(16, crc, true);
+      cv.setUint32(20, dataBytes.length, true);
+      cv.setUint32(24, dataBytes.length, true);
+      cv.setUint16(28, nameBytes.length, true);
+      cv.setUint16(30, 0, true);
+      cv.setUint16(32, 0, true);
+      cv.setUint16(34, 0, true);
+      cv.setUint16(36, 0, true);
+      cv.setUint32(38, 0, true);           // external attributes
+      cv.setUint32(42, offset, true);      // offset of local header
+      cd.set(nameBytes, 46);
+      central.push(cd);
+
+      offset += local.length + dataBytes.length;
+    });
+
+    var cdSize = central.reduce(function (s, c) { return s + c.length; }, 0);
+    var eocd = new Uint8Array(22);
+    var ev = new DataView(eocd.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(4, 0, true);
+    ev.setUint16(6, 0, true);
+    ev.setUint16(8, entries.length, true);
+    ev.setUint16(10, entries.length, true);
+    ev.setUint32(12, cdSize, true);
+    ev.setUint32(16, offset, true);
+    ev.setUint16(20, 0, true);
+
+    return new Blob(chunks.concat(central, [eocd]), { type: 'application/zip' });
+  }
+
+  /* ── fetch every project file ─────────────────────────────── */
+  function build() {
+    buildBtn.disabled = true;
+    log('<span class="dim">Fetching files…</span>');
+
+    var paths = window.BUNDLE_FILES.slice();
+    var entries = [];
+    var missing = [];
+    var done = 0;
+
+    return Promise_all(paths.map(function (path) {
+      return fetch(path, { cache: 'no-store' }).then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.arrayBuffer();
+      }).then(function (buf) {
+        entries.push({ name: path, bytes: new Uint8Array(buf), path: path });
+      }).catch(function () {
+        missing.push(path);
+      }).then(function () {
+        done++;
+        log('<span class="dim">Fetched ' + done + ' / ' + paths.length + '…</span>');
+      });
+    })).then(function () {
+      if (!entries.length) throw new Error('No files could be fetched. Use the https:// preview URL, not a local file.');
+
+      // Keep a stable, readable order: root files first, then folders.
+      entries.sort(function (a, b) {
+        var da = a.name.indexOf('/') === -1 ? 0 : 1;
+        var db = b.name.indexOf('/') === -1 ? 0 : 1;
+        if (da !== db) return da - db;
+        return a.name.localeCompare(b.name);
+      });
+
+      var zip = buildZip(entries);
+      var url = URL.createObjectURL(zip);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'budget-app.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+
+      var total = entries.reduce(function (s, e) { return s + e.bytes.length; }, 0);
+      var rows = entries.map(function (e) {
+        return '  ' + (e.name + '                              ').slice(0, 34) +
+               (e.bytes.length + ' bytes');
+      }).join('\n');
+
+      log('<span class="ok">Done — budget-app.zip downloaded.</span>\n\n' +
+          entries.length + ' files, ' + (total / 1024).toFixed(0) + ' KB total\n\n' +
+          esc(rows) +
+          (missing.length
+            ? '\n\n<span class="bad">Could not fetch: ' + esc(missing.join(', ')) + '</span>\n' +
+              'Create .nojekyll manually if it is listed (a zero-byte file).'
+            : ''));
+
+      buildBtn.hidden = true;
+      againBtn.hidden = false;
+      buildBtn.disabled = false;
+      window.__bundle = { files: entries.length, total: total, missing: missing };
+    }).catch(function (err) {
+      log('<span class="bad">' + esc(err.message) + '</span>');
+      buildBtn.disabled = false;
+      window.__bundle = { error: err.message };
+    });
+  }
+
+  function Promise_all(list) { return Promise.all(list); }
+
+  buildBtn.addEventListener('click', build);
+  againBtn.addEventListener('click', build);
+
+  // Build automatically so the bundle is ready the moment the page opens.
+  if (window.BUNDLE_FILES) build();
+  else log('<span class="bad">js/bundle-files.js did not load.</span>');
+})();
+</script>
+<script src="https://www.genspark.ai/sandbox_inspect.js"></script><script src="https://www.genspark.ai/preview_badge.js" data-gs-lang="en" defer></script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
