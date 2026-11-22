@@ -1,239 +1,226 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Download budget files</title>
-<style>
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    background: #0a0e1a; color: #eef2fb; margin: 0;
-    padding: 32px 20px; line-height: 1.55;
-  }
-  main { max-width: 620px; margin: 0 auto; }
-  h1 { font-size: 22px; margin: 0 0 6px; }
-  .sub { color: #9aa7c2; font-size: 14px; margin: 0 0 22px; }
-  button {
-    font: inherit; font-weight: 650; font-size: 15px;
-    width: 100%; min-height: 50px; border: 0; border-radius: 13px;
-    background: linear-gradient(145deg, #4f9cf9, #6f8ef7); color: #fff;
-    cursor: pointer; margin-bottom: 10px;
-  }
-  button:disabled { opacity: .55; cursor: default; }
-  button.secondary { background: #1a2237; color: #eef2fb; border: 1px solid #233049; }
-  pre {
-    background: #121829; border: 1px solid #1b2438; border-radius: 12px;
-    padding: 13px; font-size: 12px; overflow-x: auto; white-space: pre-wrap;
-    margin: 14px 0 0; font-family: ui-monospace, monospace;
-  }
-  .ok { color: #3fc4a6; } .bad { color: #f2686b; } .dim { color: #6b7899; }
-  .note {
-    background: #121829; border: 1px solid #233049; border-left: 3px solid #4f9cf9;
-    border-radius: 10px; padding: 12px 14px; font-size: 13px; margin: 0 0 20px; color: #c9d3e8;
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0e1a" id="themeColorMeta">
+  <meta name="description" content="A simple household budget tracker: log what you spend, split credit card purchases into installments, and see where your money goes each month.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Budget">
+  <title>Budget — Household spending tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<main>
-  <h1>Download your budget app files</h1>
-  <p class="sub">This packages every file GitHub Desktop needs into a single .zip.</p>
+  <a class="skip-link" href="#main">Skip to content</a>
 
-  <div class="note">
-    Only use this page from the preview URL (it starts with <strong>https://</strong>).
-    Browsers block file downloads on <code>file://</code> pages, so opening this
-    page from your hard drive will not work.
-  </div>
+  <header class="appbar">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18a2 2 0 0 1 2 2v1.5"/>
+          <path d="M3 7.5V18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2.5"/>
+          <path d="M21 9.5H16a2.5 2.5 0 0 0 0 5h5v-5Z"/>
+        </svg>
+      </span>
+      <span class="brand__name">Budget</span>
+    </div>
+    <button type="button" class="icon-btn" id="themeBtn" aria-label="Switch colour theme" title="Switch colour theme"></button>
+  </header>
 
-  <button type="button" id="buildBtn">Build the .zip</button>
-  <button type="button" id="againBtn" class="secondary" hidden>Build again</button>
+  <main class="app" id="main">
+    <!-- ── Home ─────────────────────────────────────────────── -->
+    <section class="view" id="view-home" role="tabpanel" aria-labelledby="tab-home">
+      <div class="monthbar">
+        <button type="button" class="round-btn" data-month-step="-1" aria-label="Previous month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg>
+        </button>
+        <div class="monthbar__center">
+          <span class="monthbar__label" id="monthLabel">—</span>
+          <button type="button" class="monthbar__jump" id="monthJump" hidden>Jump to this month</button>
+        </div>
+        <button type="button" class="round-btn" data-month-step="1" aria-label="Next month">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+      <div id="homeContent" class="stack"></div>
+    </section>
 
-  <pre id="out" class="dim">Waiting…</pre>
-</main>
+    <!-- ── History ──────────────────────────────────────────── -->
+    <section class="view" id="view-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+      <div class="view-head">
+        <h1 class="view-head__title">History</h1>
+        <p class="view-head__sub">Totals for past months and where the money went.</p>
+      </div>
+      <div id="historyContent" class="stack"></div>
+    </section>
 
-<script src="js/bundle-files.js"></script>
-<script>
-(function () {
-  'use strict';
+    <!-- ── Installments ─────────────────────────────────────── -->
+    <section class="view" id="view-plans" role="tabpanel" aria-labelledby="tab-plans" hidden>
+      <div class="view-head">
+        <h1 class="view-head__title">Installments</h1>
+        <p class="view-head__sub">Credit card purchases split over several months.</p>
+      </div>
+      <div id="plansContent" class="stack"></div>
+    </section>
 
-  var out = document.getElementById('out');
-  var buildBtn = document.getElementById('buildBtn');
-  var againBtn = document.getElementById('againBtn');
+    <!-- ── Settings ─────────────────────────────────────────── -->
+    <section class="view" id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+      <div class="view-head">
+        <h1 class="view-head__title">Settings</h1>
+        <p class="view-head__sub">Categories, budgets, currency and backups.</p>
+      </div>
+      <div id="settingsContent" class="stack"></div>
+    </section>
+  </main>
 
-  function log(html) { out.innerHTML = html; }
-  function esc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+  <nav class="tabbar" role="tablist" aria-label="Sections">
+    <button type="button" class="tab" id="tab-home" role="tab" data-view="home" aria-selected="true" aria-controls="view-home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/></svg>
+      <span>This month</span>
+    </button>
+    <button type="button" class="tab" id="tab-history" role="tab" data-view="history" aria-selected="false" aria-controls="view-history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M6 21v-7"/><path d="M12 21V6"/><path d="M18 21v-4"/></svg>
+      <span>History</span>
+    </button>
+    <button type="button" class="tab" id="tab-plans" role="tab" data-view="plans" aria-selected="false" aria-controls="view-plans">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M2.5 10h19"/><path d="M6.5 14.5h4"/></svg>
+      <span>Plans</span>
+    </button>
+    <button type="button" class="tab" id="tab-settings" role="tab" data-view="settings" aria-selected="false" aria-controls="view-settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h8"/><path d="M18 7h2"/><path d="M4 17h4"/><path d="M14 17h6"/><circle cx="15" cy="7" r="2.2"/><circle cx="11" cy="17" r="2.2"/></svg>
+      <span>Settings</span>
+    </button>
+  </nav>
 
-  /* ── CRC32 (required by the ZIP format) ───────────────────── */
-  var CRC_TABLE = (function () {
-    var t = new Uint32Array(256);
-    for (var i = 0; i < 256; i++) {
-      var c = i;
-      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      t[i] = c >>> 0;
-    }
-    return t;
-  })();
+  <button type="button" class="fab" id="addBtn" aria-label="Add an expense">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
 
-  function crc32(bytes) {
-    var crc = 0xFFFFFFFF;
-    for (var i = 0; i < bytes.length; i++) {
-      crc = CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
-    }
-    return (crc ^ 0xFFFFFFFF) >>> 0;
-  }
+  <!-- ── Expense sheet ──────────────────────────────────────── -->
+  <div class="sheet-backdrop" data-close-sheet hidden></div>
 
-  /* ── minimal ZIP writer, "store" method (no compression) ──── */
-  // Store-only keeps this dependency-free and is fine for text files.
-  var DOS_TIME = (12 << 11);              // 12:00:00
-  var DOS_DATE = ((2026 - 1980) << 9) | (11 << 5) | 22;
+  <section class="sheet" id="sheet-expense" role="dialog" aria-modal="true" aria-labelledby="expenseTitle" hidden>
+    <div class="sheet__grip" aria-hidden="true"></div>
+    <form class="sheet__body" id="expenseForm" novalidate>
+      <div class="sheet__head">
+        <h2 class="sheet__title" id="expenseTitle">Add expense</h2>
+        <button type="button" class="icon-btn icon-btn--flat" data-close-sheet aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
 
-  function buildZip(entries) {
-    var encoder = new TextEncoder();
-    var chunks = [];
-    var central = [];
-    var offset = 0;
+      <div class="amount-field">
+        <span class="amount-field__cur" id="formCurrency">$</span>
+        <input id="fAmount" name="amount" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-label="Amount" required>
+      </div>
+      <p class="field-error" id="fAmountError" hidden>Please enter an amount greater than 0.</p>
 
-    entries.forEach(function (entry) {
-      var nameBytes = encoder.encode(entry.name);
-      var dataBytes = entry.bytes;
-      var crc = crc32(dataBytes);
+      <fieldset class="fieldset">
+        <legend class="field__label">Category</legend>
+        <div class="chips" id="fCategoryChips" role="radiogroup" aria-label="Category"></div>
+      </fieldset>
 
-      var local = new Uint8Array(30 + nameBytes.length);
-      var dv = new DataView(local.buffer);
-      dv.setUint32(0, 0x04034b50, true);   // local file header signature
-      dv.setUint16(4, 20, true);           // version needed
-      dv.setUint16(6, 0x0800, true);       // flags: UTF-8 names
-      dv.setUint16(8, 0, true);            // method: store
-      dv.setUint16(10, DOS_TIME, true);
-      dv.setUint16(12, DOS_DATE, true);
-      dv.setUint32(14, crc, true);
-      dv.setUint32(18, dataBytes.length, true);  //compressed size
-      dv.setUint32(22, dataBytes.length, true);  // uncompressed size
-      dv.setUint16(26, nameBytes.length, true);
-      dv.setUint16(28, 0, true);           // extra field length
-      local.set(nameBytes, 30);
+      <label class="field">
+        <span class="field__label">Note <span class="field__hint">(what was it for?)</span></span>
+        <input id="fNote" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Groceries, School fees" list="noteHistory">
+        <datalist id="noteHistory"></datalist>
+      </label>
 
-      chunks.push(local, dataBytes);
+      <div class="field-row">
+        <label class="field">
+          <span class="field__label">Date</span>
+          <input id="fDate" type="date" required>
+        </label>
+        <div class="field">
+          <span class="field__label">Paid with</span>
+          <div class="segmented" id="fMethod" role="radiogroup" aria-label="Payment method">
+            <button type="button" data-method="cash" class="is-active" role="radio" aria-checked="true">Cash</button>
+            <button type="button" data-method="debit" role="radio" aria-checked="false">Debit</button>
+            <button type="button" data-method="credit" role="radio" aria-checked="false">Card</button>
+          </div>
+        </div>
+      </div>
+      <p class="field__hint field__hint--block" id="methodHint">Credit-card purchases only count for the months they are charged.</p>
 
-      var cd = new Uint8Array(46 + nameBytes.length);
-      var cv = new DataView(cd.buffer);
-      cv.setUint32(0, 0x02014b50, true);   // central directory signature
-      cv.setUint16(4, 20, true);           // version made by
-      cv.setUint16(6, 20, true);           // version needed
-      cv.setUint16(8, 0x0800, true);
-      cv.setUint16(10, 0, true);
-      cv.setUint16(12, DOS_TIME, true);
-      cv.setUint16(14, DOS_DATE, true);
-      cv.setUint32(16, crc, true);
-      cv.setUint32(20, dataBytes.length, true);
-      cv.setUint32(24, dataBytes.length, true);
-      cv.setUint16(28, nameBytes.length, true);
-      cv.setUint16(30, 0, true);
-      cv.setUint16(32, 0, true);
-      cv.setUint16(34, 0, true);
-      cv.setUint16(36, 0, true);
-      cv.setUint32(38, 0, true);           // external attributes
-      cv.setUint32(42, offset, true);      // offset of local header
-      cd.set(nameBytes, 46);
-      central.push(cd);
+      <div class="inset" id="installmentBlock" hidden>
+        <label class="switch-row">
+          <span class="switch-row__text">
+            <strong>Split into installments</strong>
+            <span class="field__hint">Charge this purchase over several months</span>
+          </span>
+          <input type="checkbox" id="fInstallToggle" class="switch">
+        </label>
+        <div id="installmentConfig" hidden>
+          <div class="stepper" role="group" aria-label="Number of installments">
+            <button type="button" class="stepper__btn" data-step="-1" aria-label="One installment fewer">−</button>
+            <div class="stepper__value"><input id="fMonths" type="number" min="2" max="60" step="1" value="3" inputmode="numeric" aria-label="Number of monthly installments"><span>months</span></div>
+            <button type="button" class="stepper__btn" data-step="1" aria-label="One installment more">+</button>
+          </div>
+          <p class="preview" id="fMonthlyPreview"></p>
+        </div>
+      </div>
 
-      offset += local.length + dataBytes.length;
-    });
+      <div class="sheet__actions">
+        <button type="button" class="btn btn--danger-ghost" id="deleteExpenseBtn" hidden>Delete</button>
+        <button type="submit" class="btn btn--primary" id="saveExpenseBtn">Save expense</button>
+      </div>
+    </form>
+  </section>
 
-    var cdSize = central.reduce(function (s, c) { return s + c.length; }, 0);
-    var eocd = new Uint8Array(22);
-    var ev = new DataView(eocd.buffer);
-    ev.setUint32(0, 0x06054b50, true);
-    ev.setUint16(4, 0, true);
-    ev.setUint16(6, 0, true);
-    ev.setUint16(8, entries.length, true);
-    ev.setUint16(10, entries.length, true);
-    ev.setUint32(12, cdSize, true);
-    ev.setUint32(16, offset, true);
-    ev.setUint16(20, 0, true);
+  <!-- ── Category sheet ─────────────────────────────────────── -->
+  <section class="sheet" id="sheet-category" role="dialog" aria-modal="true" aria-labelledby="categoryTitle" hidden>
+    <div class="sheet__grip" aria-hidden="true"></div>
+    <form class="sheet__body" id="categoryForm" novalidate>
+      <div class="sheet__head">
+        <h2 class="sheet__title" id="categoryTitle">New category</h2>
+        <button type="button" class="icon-btn icon-btn--flat" data-close-sheet aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <label class="field">
+        <span class="field__label">Name</span>
+        <input id="cName" type="text" maxlength="24" autocomplete="off" placeholder="e.g. Kids, Savings, Gifts" required>
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span class="field__label">Emoji</span>
+          <input id="cEmoji" type="text" maxlength="4" autocomplete="off" placeholder="🏷️" aria-label="Emoji">
+        </label>
+        <label class="field">
+          <span class="field__label">Monthly limit <span class="field__hint">(optional)</span></span>
+          <input id="cBudget" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" aria-label="Monthly limit">
+        </label>
+      </div>
+      <fieldset class="fieldset">
+        <legend class="field__label">Colour</legend>
+        <div class="swatches" id="cColors" role="radiogroup" aria-label="Colour"></div>
+      </fieldset>
+      <div class="sheet__actions">
+        <button type="button" class="btn btn--danger-ghost" id="deleteCategoryBtn" hidden>Delete</button>
+        <button type="submit" class="btn btn--primary">Save category</button>
+      </div>
+    </form>
+  </section>
 
-    return new Blob(chunks.concat(central, [eocd]), { type: 'application/zip' });
-  }
+  <!-- ── Plan sheet ─────────────────────────────────────────── -->
+  <section class="sheet" id="sheet-plan" role="dialog" aria-modal="true" aria-labelledby="planTitle" hidden>
+    <div class="sheet__grip" aria-hidden="true"></div>
+    <div class="sheet__body" id="planBody"></div>
+  </section>
 
-  /* ── fetch every project file ─────────────────────────────── */
-  function build() {
-    buildBtn.disabled = true;
-    log('<span class="dim">Fetching files…</span>');
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-    var paths = window.BUNDLE_FILES.slice();
-    var entries = [];
-    var missing = [];
-    var done = 0;
+  <noscript>
+    <p class="noscript">This budget tracker needs JavaScript enabled. Your data is stored only in this browser.</p>
+  </noscript>
 
-    return Promise_all(paths.map(function (path) {
-      return fetch(path, { cache: 'no-store' }).then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.arrayBuffer();
-      }).then(function (buf) {
-        entries.push({ name: path, bytes: new Uint8Array(buf), path: path });
-      }).catch(function () {
-        missing.push(path);
-      }).then(function () {
-        done++;
-        log('<span class="dim">Fetched ' + done + ' / ' + paths.length + '…</span>');
-      });
-    })).then(function () {
-      if (!entries.length) throw new Error('No files could be fetched. Use the https:// preview URL, not a local file.');
-
-      // Keep a stable, readable order: root files first, then folders.
-      entries.sort(function (a, b) {
-        var da = a.name.indexOf('/') === -1 ? 0 : 1;
-        var db = b.name.indexOf('/') === -1 ? 0 : 1;
-        if (da !== db) return da - db;
-        return a.name.localeCompare(b.name);
-      });
-
-      var zip = buildZip(entries);
-      var url = URL.createObjectURL(zip);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'budget-app.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-
-      var total = entries.reduce(function (s, e) { return s + e.bytes.length; }, 0);
-      var rows = entries.map(function (e) {
-        return '  ' + (e.name + '                              ').slice(0, 34) +
-               (e.bytes.length + ' bytes');
-      }).join('\n');
-
-      log('<span class="ok">Done — budget-app.zip downloaded.</span>\n\n' +
-          entries.length + ' files, ' + (total / 1024).toFixed(0) + ' KB total\n\n' +
-          esc(rows) +
-          (missing.length
-            ? '\n\n<span class="bad">Could not fetch: ' + esc(missing.join(', ')) + '</span>\n' +
-              'Create .nojekyll manually if it is listed (a zero-byte file).'
-            : ''));
-
-      buildBtn.hidden = true;
-      againBtn.hidden = false;
-      buildBtn.disabled = false;
-      window.__bundle = { files: entries.length, total: total, missing: missing };
-    }).catch(function (err) {
-      log('<span class="bad">' + esc(err.message) + '</span>');
-      buildBtn.disabled = false;
-      window.__bundle = { error: err.message };
-    });
-  }
-
-  function Promise_all(list) { return Promise.all(list); }
-
-  buildBtn.addEventListener('click', build);
-  againBtn.addEventListener('click', build);
-
-  // Build automatically so the bundle is ready the moment the page opens.
-  if (window.BUNDLE_FILES) build();
-  else log('<span class="bad">js/bundle-files.js did not load.</span>');
-})();
-</script>
-<script src="https://www.genspark.ai/sandbox_inspect.js"></script><script src="https://www.genspark.ai/preview_badge.js" data-gs-lang="en" defer></script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
-</body>
+  <script src="js/store.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/vendor/chart.umd.min.js" defer></script>
+  <script src="js/app.js" defer></script>
+<script src="https://www.genspark.ai/sandbox_inspect.js"></script><script src="https://www.genspark.ai/preview_badge.js" data-gs-lang="en" defer></script></body>
 </html>
