@@ -79,6 +79,7 @@ Port 8765 is used by default. If it is busy, either stop the other copy or run:
 | `js/store.js` | Data layer: persistence, migration, installment math, all reports |
 | `js/app.js` | UI layer: view rendering, sheets, charts, events, routing |
 | `js/sync.js` | Optional cross-device sync via Firebase REST (no SDK, no CDN) |
+| `js/firebase-config.js` | Optional: embed your Firebase project so new devices only need email + password |
 | `js/vendor/chart.umd.min.js` | Chart.js 4.4.1, bundled locally — no CDN, no internet needed |
 | `start-budget.bat` | Windows one-click launcher |
 | `start-budget.sh` | macOS / Linux launcher |

@@ -1013,10 +1013,20 @@
           return;
         }
         if (action === 'sync-forget-config') {
-          if (window.confirm('Forget this Firebase config? Your local data is not touched, and nothing is deleted from Firebase.')) {
+          if (window.confirm('Forget this Firebase project on this device?\n\nYour local data is not touched, and nothing is deleted from Firebase. Sync stays off on this device until you set it up again.')) {
             window.BudgetSync.clearConfig();
             renderSettings();
-            toast('Firebase config removed');
+            toast('Sync turned off on this device');
+          }
+          return;
+        }
+        if (action === 'sync-show-manual') {
+          // Reveal the paste-a-config form even though a built-in project exists.
+          var manual = document.getElementById('syncManualConfig');
+          if (manual) {
+            manual.hidden = false;
+            var box = manual.querySelector('textarea');
+            if (box) box.focus();
           }
           return;
         }
@@ -1160,14 +1170,39 @@
     var body = '';
 
     if (!st.configured) {
+      var embedded = !!(Sync && Sync.hasEmbeddedConfig && Sync.hasEmbeddedConfig());
       body +=
-        '<p class="field__hint" style="margin:0 0 10px">Optional. Add a free Firebase Realtime Database so your PC and phone share one budget automatically. Without it, each device keeps its own copy and you move data with backups.</p>' +
-        '<p class="field__hint" style="margin:0 0 10px">You only need two values. Find the <strong style="color:var(--text)">Web API Key</strong> under Project settings &rarr; General, and the <strong style="color:var(--text)">Database URL</strong> at the top of Build &rarr; Realtime Database. Copy the database URL exactly &mdash; it may end in <code>firebasedatabase.app</code>.</p>' +
-        '<label class="field"><span class="field__label">Firebase key &amp; database URL</span>' +
-          '<textarea id="syncConfigText" rows="4" placeholder="apiKey: &quot;AIza...&quot;\ndatabaseURL: &quot;https://your-project-default-rtdb.firebaseio.com&quot;" ' +
-          'style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none;resize:vertical;font-family:ui-monospace,monospace;font-size:12px"></textarea></label>' +
-        '<p class="field__hint" style="margin:8px 0 0">The whole <code>firebaseConfig = { ... }</code> block works too, if you can find it.</p>' +
-        '<button type="button" class="btn btn--block btn--sm" style="margin-top:10px" data-action="sync-save-config">Save config</button>';
+        '<p class="field__hint" style="margin:0 0 10px">Optional. Add a free Firebase Realtime Database so your PC and phone share one budget automatically. Without it, each device keeps its own copy and you move data with backups.</p>';
+
+      if (embedded) {
+        // The app ships with the project config, so a new browser only needs
+        // credentials. Offer a manual override but do not require it.
+        body +=
+          '<p class="field__hint" style="margin:0 0 10px">A Firebase project is already set up for this app. Just sign in below with the email and password you use on your other devices.</p>' +
+          '<label class="field"><span class="field__label">Email</span>' +
+            '<input id="syncEmail" type="email" autocomplete="username" placeholder="you@example.com"></label>' +
+          '<label class="field" style="margin-top:10px"><span class="field__label">Password</span>' +
+            '<input id="syncPassword" type="password" autocomplete="current-password" placeholder="Your password"></label>' +
+          '<div class="set-actions" style="margin-top:12px">' +
+            '<button type="button" class="btn btn--primary btn--block" data-action="sync-signin">Sign in</button>' +
+            '<button type="button" class="btn btn--block" data-action="sync-signup">Create account</button>' +
+            '<button type="button" class="btn btn--ghost btn--block btn--sm" data-action="sync-show-manual">Use a different Firebase project</button>' +
+          '</div>' +
+          '<div id="syncManualConfig" hidden style="margin-top:14px">' +
+            '<label class="field"><span class="field__label">Your own Firebase key &amp; database URL</span>' +
+              '<textarea id="syncConfigText" rows="4" placeholder="apiKey: &quot;AIza...&quot;\ndatabaseURL: &quot;https://your-project-default-rtdb.firebaseio.com&quot;" ' +
+              'style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none;resize:vertical;font-family:ui-monospace,monospace;font-size:12px"></textarea></label>' +
+            '<button type="button" class="btn btn--block btn--sm" style="margin-top:10px" data-action="sync-save-config">Save this config instead</button>' +
+          '</div>';
+      } else {
+        body +=
+          '<p class="field__hint" style="margin:0 0 10px">You only need two values. Find the <strong style="color:var(--text)">Web API Key</strong> under Project settings &rarr; General, and the <strong style="color:var(--text)">Database URL</strong> at the top of Build &rarr; Realtime Database. Copy the database URL exactly &mdash; it may end in <code>firebasedatabase.app</code>.</p>' +
+          '<label class="field"><span class="field__label">Firebase key &amp; database URL</span>' +
+            '<textarea id="syncConfigText" rows="4" placeholder="apiKey: &quot;AIza...&quot;\ndatabaseURL: &quot;https://your-project-default-rtdb.firebaseio.com&quot;" ' +
+            'style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none;resize:vertical;font-family:ui-monospace,monospace;font-size:12px"></textarea></label>' +
+          '<p class="field__hint" style="margin:8px 0 0">The whole <code>firebaseConfig = { ... }</code> block works too, if you can find it.</p>' +
+          '<button type="button" class="btn btn--block btn--sm" style="margin-top:10px" data-action="sync-save-config">Save config</button>';
+      }
     } else if (!st.signedIn) {
       body +=
         '<p class="field__hint" style="margin:0 0 12px">Config saved. Now create an account (or sign in to the one you already made on your other device). Use the same account on every device.</p>' +

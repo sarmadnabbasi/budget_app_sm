@@ -16,6 +16,9 @@
 
   var CONFIG_KEY = 'household-budget-sync-config';
   var SESSION_KEY = 'household-budget-sync-session';
+  // Set when the user explicitly opts out, so a built-in config in
+  // js/firebase-config.js cannot silently re-enable sync on that device.
+  var DISABLED_KEY = 'household-budget-sync-disabled';
   var POLL_MS = 15000;
 
   var AUTH_BASE = 'https://identitytoolkit.googleapis.com/v1/accounts:';
@@ -87,22 +90,65 @@
   function setConfig(cfg) {
     config = { apiKey: cfg.apiKey, databaseURL: cfg.databaseURL.replace(/\/+$/, ''), projectId: cfg.projectId || '' };
     write(CONFIG_KEY, JSON.stringify(config));
+    // An explicit config means the user wants sync, so clear any opt-out.
+    write(DISABLED_KEY, null);
     return config;
   }
 
+  /**
+   * Config resolution order:
+   *   1. What the user saved in Settings (localStorage) — highest priority, so
+   *      anyone who already configured a device keeps working untouched.
+   *   2. js/firebase-config.js embedded in the app, so a brand-new browser only
+   *      needs an email + password instead of the API key pasted again.
+   * The Firebase web apiKey is public by design (database rules do the
+   * protecting), so shipping it with the code is safe.
+   */
   function loadConfig() {
     if (config) return config;
+
+    // An explicit "forget this project" wins over the embedded defaults,
+    // otherwise the built-in config would silently resurrect itself.
+    if (read(DISABLED_KEY)) return null;
+
     var saved = readJSON(CONFIG_KEY);
-    if (saved && saved.apiKey && saved.databaseURL) config = saved;
-    return config;
+    if (saved && saved.apiKey && saved.databaseURL) { config = saved; return config; }
+
+    var embedded = global.BUDGET_FIREBASE_CONFIG;
+    if (embedded && embedded.apiKey && embedded.databaseURL) {
+      config = {
+        apiKey: String(embedded.apiKey).trim(),
+        databaseURL: String(embedded.databaseURL).trim().replace(/\/+$/, ''),
+        projectId: embedded.projectId ? String(embedded.projectId).trim() : ''
+      };
+      return config;
+    }
+
+    return null;
   }
 
+  /**
+   * Forget the current project on THIS device. Records an opt-out so a config
+   * shipped in js/firebase-config.js does not immediately switch sync back on.
+   * Local budget data is never touched, and nothing is deleted from Firebase.
+   */
   function clearConfig() {
     config = null;
     session = null;
     write(CONFIG_KEY, null);
     write(SESSION_KEY, null);
+    write(DISABLED_KEY, '1');
     stopTimers();
+  }
+
+  /** True when the user deliberately turned sync off on this device. */
+  function isDisabledByUser() { return !!read(DISABLED_KEY); }
+
+  /** Undo the opt-out so a built-in config applies again. */
+  function reenableEmbedded() {
+    write(DISABLED_KEY, null);
+    config = null;
+    return loadConfig();
   }
 
   function isConfigured() { return !!loadConfig(); }
@@ -341,6 +387,12 @@
     parseConfigText: parseConfigText,
     setConfig: setConfig,
     clearConfig: clearConfig,
+    isDisabledByUser: isDisabledByUser,
+    reenableEmbedded: reenableEmbedded,
+    hasEmbeddedConfig: function () {
+      var e = global.BUDGET_FIREBASE_CONFIG;
+      return !!(e && e.apiKey && e.databaseURL);
+    },
     isConfigured: isConfigured,
     isSignedIn: isSignedIn,
     currentUser: currentUser,

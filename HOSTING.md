@@ -145,17 +145,48 @@ configure it, the app behaves exactly as before (local-only, offline-first).
 
 5. **Build → Authentication → Get started** → **Sign-in method** tab → enable
    **Email/Password** → save.
-6. **Project settings** (gear icon) → scroll to **Your apps** → click the **Web**
-   icon `</>` → register the app (any nickname, no hosting needed) → copy the
-   `firebaseConfig = { ... }` block it shows.
-7. In the app: **Settings → Sync across devices** → paste that whole block into
-   the textarea → **Save config**.
+6. **You need only two values**, and you do not need the `</>` register-app dialog:
+   - **Web API Key** — Project settings (gear) → **General** → the *Web API Key* row
+     (starts with `AIza...`)
+   - **Database URL** — Build → **Realtime Database** → the URL shown at the top of
+     that page. Copy it exactly; newer projects end in `.firebasedatabase.app`.
+7. In the app: **Settings → Sync across devices** → paste both values → **Save config**.
 8. Enter an email and password → **Create account**. This is a private account
    inside *your own* Firebase project, not a Google account.
-9. On your phone: open the same URL, paste the same config, then **Sign in** with
-   the same email and password.
+9. On your phone: open the same URL, **paste the same config**, then **Sign in**
+   with the same email and password.
 
 Both devices now converge on one budget.
+
+#### So you never paste the config again
+
+By default the config lives only in each browser's storage, so every new browser
+would need it pasted again. To avoid that, embed it once in the app's code:
+
+1. Open **`js/firebase-config.js`** and fill in the two values:
+
+   ```js
+   window.BUDGET_FIREBASE_CONFIG = {
+     apiKey: "AIza...your key...",
+     databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+     projectId: ""
+   };
+   ```
+
+2. Commit it to the repo (and to your local folder if you run it locally).
+
+From then on, **any new browser or device only asks for your email and password.**
+A fresh browser lands straight on the sign-in form.
+
+**Is committing the API key safe?** Yes. A Firebase *web* API key identifies your
+project; it does not grant access to your data. Access is controlled by the
+Realtime Database rules from step 4 — a signed-in user can only read and write
+their own `uid`. Someone with your key still cannot read your budget without your
+password. This is exactly how every Firebase web app works.
+
+> Precedence: a config saved in Settings wins over the embedded one, so any device
+> already set up keeps working. "Use a different Firebase project" opts that device
+> out and is remembered, so the built-in config does not silently re-enable itself.
 
 #### How the sync behaves
 
