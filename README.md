@@ -8,6 +8,9 @@ it behaves like a native app (full screen, own icon, works offline).
 free static hosting so it's available on both PC and phone (see **HOSTING.md**).
 There is no account, no server to pay for and no build step.
 
+**Live site:** https://sarmadnabhas.github.io/budget_app_sm/
+(GitHub Pages, free. Repo: `sarmadnabhas/budget_app_sm`.)
+
 Data is stored in the browser's local storage on each device, with JSON
 backup/restore built in. Optionally, free Firebase sync can keep one shared
 budget across PC and phone (off by default — see **HOSTING.md**).

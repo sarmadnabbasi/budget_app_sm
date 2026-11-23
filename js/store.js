@@ -235,16 +235,36 @@
     return out;
   }
 
+  // The exact serialised form we last read or wrote, used to detect edits made
+  // by another tab (or by a sync merge running in a sibling tab).
+  var lastRaw = null;
+
   function load() {
-    if (state) return state;
     var raw = safeGet(STORE_KEY);
-    var parsed = null;
-    if (raw) {
-      try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
+
+    // First run in this page.
+    if (!state) {
+      var parsed = null;
+      if (raw) {
+        try { parsed = JSON.parse(raw); } catch (e) { parsed = null; }
+      }
+      // Keep a one-time backup of anything unreadable so nothing is lost silently.
+      if (raw && parsed === null) safeSet(STORE_KEY + '-recovered-' + Date.now(), raw);
+      state = normalise(parsed);
+      lastRaw = null;
+      return state;
     }
-    // Keep a one-time backup of anything unreadable so nothing is lost silently.
-    if (raw && parsed === null) safeSet(STORE_KEY + '-recovered-' + Date.now(), raw);
-    state = normalise(parsed);
+
+    // Another tab (or a sync merge in a sibling tab) wrote to storage since we
+    // last read it. Adopt that data so we never mutate or overwrite stale state.
+    if (raw && raw !== lastRaw) {
+      var fresh = null;
+      try { fresh = JSON.parse(raw); } catch (e) { fresh = null; }
+      if (fresh && typeof fresh === 'object') {
+        state = normalise(fresh);
+        lastRaw = raw;
+      }
+    }
     return state;
   }
 
@@ -264,7 +284,10 @@
   function save() {
     load();
     state.updatedAt = new Date().toISOString();
-    var ok = safeSet(STORE_KEY, JSON.stringify(state));
+    var serialised = JSON.stringify(state);
+    var ok = safeSet(STORE_KEY, serialised);
+    // Remember our own write so the next load() does not treat it as external.
+    if (ok) lastRaw = serialised;
     if (ok && !silentDepth && changeHook) {
       try { changeHook(); } catch (e) { /* sync must never break saving */ }
     }
