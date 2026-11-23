@@ -1161,10 +1161,12 @@
 
     if (!st.configured) {
       body +=
-        '<p class="field__hint" style="margin:0 0 12px">Optional. Add a free Firebase Realtime Database so your PC and phone share one budget automatically. Without it, each device keeps its own copy and you move data with backups.</p>' +
-        '<label class="field"><span class="field__label">Firebase config</span>' +
-          '<textarea id="syncConfigText" rows="5" placeholder="Paste the firebaseConfig block from your Firebase project settings" ' +
+        '<p class="field__hint" style="margin:0 0 10px">Optional. Add a free Firebase Realtime Database so your PC and phone share one budget automatically. Without it, each device keeps its own copy and you move data with backups.</p>' +
+        '<p class="field__hint" style="margin:0 0 10px">You only need two values. Find the <strong style="color:var(--text)">Web API Key</strong> under Project settings &rarr; General, and the <strong style="color:var(--text)">Database URL</strong> at the top of Build &rarr; Realtime Database. Copy the database URL exactly &mdash; it may end in <code>firebasedatabase.app</code>.</p>' +
+        '<label class="field"><span class="field__label">Firebase key &amp; database URL</span>' +
+          '<textarea id="syncConfigText" rows="4" placeholder="apiKey: &quot;AIza...&quot;\ndatabaseURL: &quot;https://your-project-default-rtdb.firebaseio.com&quot;" ' +
           'style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none;resize:vertical;font-family:ui-monospace,monospace;font-size:12px"></textarea></label>' +
+        '<p class="field__hint" style="margin:8px 0 0">The whole <code>firebaseConfig = { ... }</code> block works too, if you can find it.</p>' +
         '<button type="button" class="btn btn--block btn--sm" style="margin-top:10px" data-action="sync-save-config">Save config</button>';
     } else if (!st.signedIn) {
       body +=

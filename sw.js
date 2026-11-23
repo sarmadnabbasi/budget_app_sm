@@ -2,7 +2,7 @@
  * The app is a single page; cache the shell so it opens without a connection.
  * Bump CACHE_VERSION when shipping changes so old files are dropped.
  */
-var CACHE_VERSION = 'budget-v5';
+var CACHE_VERSION = 'budget-v6';
 var ASSETS = [
   './',
   './index.html',
