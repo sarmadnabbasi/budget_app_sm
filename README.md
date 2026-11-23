@@ -38,6 +38,51 @@ budget across PC and phone (off by default — see **HOSTING.md**).
   amount, a per-month progress strip, and a full payment schedule per plan.
 - **Settings** — 33 currencies, monthly budget, category management, dark/light
   theme, JSON backup download and restore (replace or merge), and a reset.
+- **Voice entry (push to talk)** — in the add-expense sheet, tap the mic and say
+  the expense, e.g. *"spent forty five on groceries yesterday"* or *"1200 over 6
+  months laptop"*. The form is pre-filled and read back to you, then you tap
+  **Save** yourself. Voice **never** saves on its own — see below.
+
+## Voice entry
+
+A microphone button sits at the top of the add-expense sheet. Tap it, speak, and
+the form fills itself in:
+
+| You say | It fills in |
+| --- | --- |
+| *"spent forty five dollars on groceries yesterday"* | 45.00 · Household · groceries · yesterday |
+| *"coffee three fifty"* | 3.50 · Food · coffee |
+| *"fuel 80"* | 80.00 · Transport · fuel |
+| *"1200 over 6 months laptop"* | 1200.00 · 6 months · Card · November start |
+| *"paid 50 cash for cinema"* | 50.00 · Entertainment · cash |
+| *"school fees 500 on the 5th"* | 500.00 · Compulsory · on the 5th |
+| *"twelve hundred for a laptop on card"* | 1200.00 · card |
+| *"100 doctor day before yesterday"* | 100.00 · Health · two days ago |
+
+**Voice fills the form; it never commits.** After a phrase is heard, the voice
+row shows what it understood in plain words (*"Filled $45.00 · Household ·
+Nov 22 — check it, then tap Save"*) and puts the cursor on the amount. Speech
+recognition confuses *fifteen* and *fifty* often enough that a finance app should
+never save a misheard number silently, so **Save** always stays your decision.
+
+**What it understands:** digit amounts (`45`, `45.75`, `1,200`, `2k`), number
+words (`forty five`, `twelve hundred`, `two hundred and fifty`), money shorthand
+(`three fifty` = 3.50), currency words (dollars, rupees, dirhams, pounds…),
+installments (`over 6 months`, `in 4 installments` — which implies card), payment
+method (cash / card / credit / debit), dates (today, yesterday, tomorrow, day
+before yesterday, weekday names, month names, `on the 5th`) and categories —
+both your real category names and common synonyms (`groceries` → Household,
+`cinema` → Entertainment).
+
+**Browser support:** Chrome, Edge, and Chrome on Android. Desktop Firefox and
+Safari have no speech recognition API; the mic button then shows as disabled
+with *"Voice input not available here"* and the form works exactly as before —
+typing is never blocked. Voice also needs **https** (or `localhost`), and Chrome
+sends the audio to Google's servers to transcribe it, so voice entry needs an
+internet connection. All other app features stay fully offline.
+
+**No keys, no cost, no backend.** The parser is plain JavaScript in `js/voice.js`.
+There is no AI service, no API key and nothing to pay for.
 
 ## Running it locally
 
@@ -78,6 +123,7 @@ Port 8765 is used by default. If it is busy, either stop the other copy or run:
 | `css/style.css` | All styling; mobile-first, dark default + light theme, safe-area aware |
 | `js/store.js` | Data layer: persistence, migration, installment math, all reports |
 | `js/app.js` | UI layer: view rendering, sheets, charts, events, routing |
+| `js/voice.js` | Push-to-talk: pure transcript parser + Web Speech API wrapper |
 | `js/sync.js` | Optional cross-device sync via Firebase REST (no SDK, no CDN) |
 | `js/firebase-config.js` | Optional: embed your Firebase project so new devices only need email + password |
 | `js/vendor/chart.umd.min.js` | Chart.js 4.4.1, bundled locally — no CDN, no internet needed |
@@ -146,6 +192,18 @@ Checked in a headless browser on a 390 px phone viewport (and 1280 px desktop):
   preserves expenses with no orphan category ids, comma/symbol amount parsing,
   month arithmetic across year boundaries, invalid amounts rejected, and
   export→import round trips (merge and replace, plus legacy format migration).
+- 66/66 automated voice-parser assertions pass, covering the phrasings listed
+  above plus the traps: `"6 months"` is never read as the amount, `"the 5th"`
+  becomes a date instead of a number, `"day before yesterday"` is two days ago,
+  `"three fifty"` is 3.50 not 350, out-of-range installment counts are rejected
+  with a warning, renamed/custom category names win over synonyms, and deleted
+  categories are not matched.
+- 33/33 automated voice UI assertions pass in the real app: the mic fills amount,
+  category, note, date, method and the installment switch; the read-back text
+  appears; an unrecognised phrase warns instead of guessing; a second phrase
+  replaces the first; closing and reopening the sheet resets the mic; and —
+  critically — **no expense is ever created by voice alone**, while tapping
+  Save right after does store it.
 
 ## Remaining ideas
 

@@ -2,7 +2,7 @@
  * The app is a single page; cache the shell so it opens without a connection.
  * Bump CACHE_VERSION when shipping changes so old files are dropped.
  */
-var CACHE_VERSION = 'budget-v7';
+var CACHE_VERSION = 'budget-v8';
 var ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ var ASSETS = [
   './js/store.js',
   './js/firebase-config.js',
   './js/sync.js',
+  './js/voice.js',
   './js/app.js',
   './js/vendor/chart.umd.min.js',
   './manifest.json',

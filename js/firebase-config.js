@@ -25,7 +25,7 @@
  * asks for the config in Settings as before.
  */
 window.BUDGET_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyB8KUTHs5cSLIGwACtGP6FuhSqgDrF0iCc",
-  databaseURL: "https://budget-app-sm-c586e-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "budget-app-sm-c586e"
+  apiKey: "",
+  databaseURL: "",
+  projectId: ""
 };

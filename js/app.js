@@ -785,6 +785,11 @@
       return '<option value="' + esc(n) + '"></option>';
     }).join('');
 
+    // Reset first, then let initVoice() state the browser-support verdict —
+    // the other order would let the reset overwrite the "not supported" text.
+    voiceReset();
+    initVoice();
+
     openSheet('sheet-expense');
     setTimeout(function () { $('#fAmount').focus(); }, 120);
   }
@@ -825,6 +830,197 @@
     if (ui.view === 'plans') renderPlans();
     toast(ui.form.editingId ? 'Expense updated' : (payload.months ? 'Plan saved · ' + payload.months + ' months' : 'Expense saved'));
     ui.form.editingId = null;
+  }
+
+  /* ── VOICE ENTRY (push-to-talk) ────────────────────────────── */
+
+  /* The microphone only ever PREFILLS this form. It never saves. Speech
+   * recognition mishears numbers often enough that a finance app must always
+   * show the user what it thinks it heard before anything is committed. */
+
+  var voice = { listening: false, supported: false, ready: false };
+
+  function voiceEls() {
+    return {
+      block: $('#voiceBlock'),
+      btn: $('#voiceBtn'),
+      title: $('#voiceTitle'),
+      sub: $('#voiceSub')
+    };
+  }
+
+  function prettyDay(iso) {
+    if (!iso) return '';
+    var p = String(iso).split('-');
+    if (p.length < 3) return iso;
+    if (iso === S.todayStr()) return 'today';
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    if (isNaN(d.getTime())) return iso;
+    try { return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
+    catch (e) { return iso; }
+  }
+
+  function voiceSetState(state, titleText, subHtml) {
+    var el = voiceEls();
+    if (!el.block) return;
+    el.block.classList.toggle('is-heard', state === 'heard');
+    el.block.classList.toggle('is-warn', state === 'warn');
+    el.btn.classList.toggle('is-listening', state === 'listening');
+    el.btn.setAttribute('aria-pressed', state === 'listening' ? 'true' : 'false');
+    el.btn.setAttribute('aria-label', state === 'listening' ? 'Stop listening' : 'Speak an expense');
+    if (titleText != null) {
+      el.title.textContent = titleText;
+      el.title.setAttribute('title', titleText);
+    }
+    if (subHtml != null) el.sub.innerHTML = subHtml;
+  }
+
+  function voiceReset() {
+    var V = window.BudgetVoice;
+    if (V && V.isListening()) V.stop();
+    voice.listening = false;
+    var el = voiceEls();
+    if (!el.block) return;
+    el.block.classList.remove('is-heard', 'is-warn');
+    el.btn.classList.remove('is-listening');
+    el.btn.setAttribute('aria-pressed', 'false');
+    el.btn.setAttribute('aria-label', 'Speak an expense');
+    el.title.textContent = 'Speak an expense';
+    el.title.setAttribute('title', 'Speak an expense');
+    el.sub.textContent = 'Tap the mic, then say it \u2014 \u201cforty five on groceries yesterday\u201d.';
+  }
+
+  /** Copy a parsed draft into the existing form fields (no saving). */
+  function applyVoiceDraft(draft) {
+    if (draft.amount != null && draft.amount > 0) {
+      $('#fAmount').value = Number(draft.amount).toFixed(2);
+    }
+    $('#fAmountError').hidden = true;
+
+    if (draft.note) $('#fNote').value = draft.note;
+    if (draft.date) $('#fDate').value = draft.date;
+
+    if (draft.categoryId) {
+      ui.form.categoryId = draft.categoryId;
+      buildCategoryChips(draft.categoryId);
+    }
+
+    // setFormMethod resets the installment switch, so set the split afterwards.
+    setFormMethod(draft.method || 'cash');
+    if (draft.months >= 2) {
+      $('#fMonths').value = draft.months;
+      $('#fInstallToggle').checked = true;
+      $('#installmentConfig').hidden = false;
+    }
+    updateMonthlyPreview();
+  }
+
+  function voiceHandleResult(transcript) {
+    var V = window.BudgetVoice;
+    if (!V || !transcript) return;
+
+    var draft = V.parse(transcript, S.categories());
+    applyVoiceDraft(draft);
+
+    // Build a plain-language read-back so a misheard number is obvious.
+    var bits = [];
+    if (draft.amount != null) bits.push(fmt(draft.amount));
+    if (draft.categoryId) bits.push(S.categoryById(draft.categoryId).name);
+    if (draft.dateStated) bits.push(prettyDay(draft.date));
+    if (draft.months >= 2) bits.push(draft.months + ' months');
+    if (draft.method === 'credit' && draft.months < 2) bits.push('card');
+    if (draft.method === 'debit') bits.push('debit');
+
+    var heard = '\u201c' + draft.heard + '\u201d';
+
+    if (draft.amount == null) {
+      voiceSetState('warn', heard,
+        esc(draft.warnings[0] || 'No amount heard.') + ' Check the fields and type it in.');
+      return;
+    }
+
+    var filled = 'Filled <strong>' + esc(bits.join(' \u00b7 ')) + '</strong>';
+    if (draft.warnings.length) {
+      voiceSetState('warn', heard, filled + '. ' + esc(draft.warnings[0]));
+    } else {
+      voiceSetState('heard', heard, filled + ' \u2014 check it, then tap Save.');
+    }
+
+    // Put the cursor on the amount so a wrong number is one tap from fixed.
+    try { $('#fAmount').focus({ preventScroll: true }); } catch (e) { $('#fAmount').focus(); }
+  }
+
+  function startVoice() {
+    var V = window.BudgetVoice;
+    if (!V) { voiceSetState('warn', 'Voice unavailable', 'The voice script did not load.'); return; }
+
+    if (voice.listening) { V.stop(); return; }
+
+    voiceSetState('listening', 'Listening\u2026', 'Say the amount and what it was for.');
+    var started = V.start({
+      onStart: function () {
+        voice.listening = true;
+        voiceSetState('listening', 'Listening\u2026', 'Say the amount and what it was for.');
+      },
+      onInterim: function (text) {
+        voiceSetState('listening', text, 'Listening\u2026 tap the mic to stop.');
+      },
+      onResult: function (text) {
+        voice.listening = false;
+        voiceHandleResult(text);
+      },
+      onError: function (message) {
+        voice.listening = false;
+        voiceSetState('warn', 'Did not catch that', esc(message));
+      },
+      onEnd: function () {
+        voice.listening = false;
+        var el = voiceEls();
+        el.btn.classList.remove('is-listening');
+        el.btn.setAttribute('aria-pressed', 'false');
+        el.btn.setAttribute('aria-label', 'Speak an expense');
+      }
+    });
+
+    if (!started) voice.listening = false;
+  }
+
+  /** Called once the expense sheet is visible, to reflect browser support. */
+  function initVoice() {
+    var V = window.BudgetVoice;
+    var el = voiceEls();
+    if (!el.block || !el.btn) return;
+
+    var supported = !!(V && V.isSupported());
+    voice.supported = supported;
+    voice.ready = true;
+
+    if (!supported) {
+      el.btn.disabled = true;
+      el.btn.style.opacity = '.45';
+      el.btn.style.cursor = 'default';
+      el.btn.setAttribute('aria-disabled', 'true');
+      voiceSetState('warn', 'Voice input not available here',
+        'This browser has no speech recognition. Chrome, Edge or Chrome on Android works. You can still type the expense.');
+      return;
+    }
+
+    el.btn.disabled = false;
+    el.btn.style.opacity = '';
+    el.btn.style.cursor = '';
+    el.btn.removeAttribute('aria-disabled');
+  }
+
+  function bindVoiceEvents() {
+    var el = voiceEls();
+    if (!el.btn) return;
+    el.btn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      startVoice();
+    });
+    // Some phones fire a full pointer sequence; keep the tap from also
+    // focusing the amount field and hiding the on-screen result.
+    el.btn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
   }
 
   /* ── CATEGORY SHEET ────────────────────────────────────────── */
@@ -899,6 +1095,8 @@
 
   function closeSheet(quiet) {
     if (!quiet && !ui.sheetOpen) return;
+    // Never leave the microphone recording after the sheet disappears.
+    if (window.BudgetVoice && window.BudgetVoice.isListening()) window.BudgetVoice.stop();
     ui.sheetOpen = null;
     $('#sheet-expense').hidden = true;
     $('#sheet-category').hidden = true;
@@ -1119,6 +1317,7 @@
 
     $('#expenseForm').addEventListener('submit', submitExpense);
     $('#categoryForm').addEventListener('submit', submitCategory);
+    bindVoiceEvents();
 
     $('#deleteExpenseBtn').addEventListener('click', function () {
       var id = ui.form.editingId;
